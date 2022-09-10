@@ -4,6 +4,8 @@ transformed_dataset
 amex-default-prediction.zip
 sample_submission.csv
 
+.vscode
+optuna.db
 data/*
 cache/*
 catboost_info
