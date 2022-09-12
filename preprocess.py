@@ -2,6 +2,7 @@ import logging
 import joblib
 import pathlib
 import numpy as np
+import pandas as pd
 
 from data import Dataset
 from sklearn.experimental import enable_iterative_imputer
@@ -10,6 +11,19 @@ from sklearn.preprocessing import StandardScaler
 
 log = logging.getLogger(__name__)
 
+def remove_correlated_features(df, drop_percentage):
+    log.debug("Computing correlation matrix")
+    corr = df.corr()
+    corr_relevant = corr.where(np.triu(np.ones(corr.shape), k=0)==1)[corr != 1][corr >= drop_percentage]
+    delete_cols = []
+    for row in corr_relevant.index:
+        for col in corr_relevant.index:
+            if pd.notna(corr_relevant.loc[row, col]):
+                log.debug(f'Rows {row}, {col} very correlated: {corr_relevant.loc[row, col]}')
+                delete_cols.append(col)
+    for col in set(delete_cols):
+        df = df.drop(col, axis=1)
+    return df, set(delete_cols)
 
 class Preprocessor:
     def __init__(self, dataset: Dataset, cache_dir="cache") -> None:
@@ -67,6 +81,7 @@ class AmexPreprocessor(Preprocessor):
             "float_simple_imputer_strategy": "mean",
             "float_simple_imputer_fill_value": 0, # Only used if strategy=constant
             "float_scale": True, # Whether to use standardscaler
+            "correlation_drop_percentage": 0.95 # Delete Features with higher than this correlation coefficient
         },
         cache_dir="cache",
         # more config here for bayes opt
@@ -92,6 +107,9 @@ class AmexPreprocessor(Preprocessor):
             raise NotImplementedError(f"No such float imputer method: {self.config['float_imputer']}")
 
     def preprocess(self, X, y=None):
+        X, _ = remove_correlated_features(X, self.config["correlation_drop_percentage"])
+
+
         # Stack Dataframe so that each customer is represented by one row, make columns wider
         X_reset = X.reset_index()
         X_reset['group_index'] = X.groupby('customer_ID').cumcount()
@@ -117,13 +135,18 @@ class AmexPreprocessor(Preprocessor):
         for col in cols:
             X_unstack[col] = X_unstack[col].cat.codes
 
-        # Convert to numpy arrays and return
+        # Remove highly correlated features
+        # TODO maybe. Or rather perhaps condense time series somehow
+        # X_unstack, deleted_cols = remove_correlated_features(X_unstack, self.config["correlation_drop_percentage"])
 
-        X_floats = X_unstack[float_vars_wide].to_numpy()
+        # Convert to numpy arrays and return
+        X_floats = X_unstack[set(float_vars_wide)].to_numpy()
         X_floats = self.float_impute(X_floats)
         # Scale
         if self.config["float_scale"]:
             X_floats = self.float_scaler.fit_transform(X_floats)
-        X_cat = X_unstack[cat_vars_wide].to_numpy()
+        X_cat = X_unstack[set(cat_vars_wide)].to_numpy()
+
+        
         y_np = y.target.to_numpy() if y is not None else None
         return X_floats, X_cat, y_np

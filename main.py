@@ -24,7 +24,8 @@ def objective(trial):
     learning_rate = trial.suggest_float("learning_rate", 1e-3, 1e-1, log=True)
     depth = trial.suggest_int("depth", 3, 11)
     boosting_type = trial.suggest_categorical("boosting_type", ["Ordered", "Plain"])
-    objective = trial.suggest_categorical("objective", ["Logloss", "CrossEntropy"]),
+    corr_drop_percentage = trial.suggest_float("correlation_drop_percentage", 0.01, 0.99)
+    #objective = trial.suggest_categorical("objective", ["Logloss", "CrossEntropy"]),
     exp = Experiment(
         "exp",
         ds,
@@ -33,6 +34,7 @@ def objective(trial):
             "float_simple_imputer_strategy": impute_strategy,
             "float_simple_imputer_fill_value": 0, # Only used if strategy=constant
             "float_scale": True, # Whether to use standardscaler
+            "correlation_drop_percentage": corr_drop_percentage,
         }),
         CatboostMethod,
         method_config={
@@ -44,13 +46,13 @@ def objective(trial):
             "task_type": "GPU" if torch.cuda.is_available() else None,
             "eval_metric": "Accuracy",
             "boosting_type": boosting_type,
-            "objective": objective
+            #"objective": objective
         },
         method_fit_kwargs={
             "callbacks": [CatBoostPruningCallback(trial, "Accuracy")]
         },
         kfold_ensemble_num=1, # Only train 1 classifier for now, quick dev
-        use_cache=True,
+        use_cache=False,
     )
     return run_experiment(exp)
 
