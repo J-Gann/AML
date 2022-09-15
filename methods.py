@@ -72,7 +72,15 @@ class PersistDatasetMethod(Method):
         log.debug("Not going to do anything, but persisting the received data.")
         output_dir = pathlib.Path(self.config["target_dir"])
         output_dir.mkdir(exist_ok=True, parents=True)
-        import ipdb;ipdb.set_trace()
+        with open(output_dir / "amex_preprocessed.npz", 'wb') as fd:
+            np.savez_compressed(fd, **dict(
+                train_floats=X_train_f,
+                train_cat=X_train_c,
+                train_y=y_train,
+                test_floats=X_val_f,
+                test_cat=X_val_c,
+                test_y=y_val,
+            ))
 
 class CatboostMethod(Method):
     def __init__(
