@@ -4,6 +4,7 @@ import pathlib
 import joblib
 
 from catboost import CatBoostClassifier, Pool, FeaturesData
+from pathlib import Path
 
 log = logging.getLogger(__name__)
 
@@ -62,6 +63,24 @@ class StubMethod(Method):
     def eval(self, X_floats, X_cat):
         return np.zeros(len(X_floats))
 
+class PersistDatasetMethod(Method):
+    def __init__(self, config) -> None:
+        super().__init__()
+        self.config = config
+
+    def train(self, X_train_f, X_val_f, X_train_c, X_val_c, y_train, y_val):
+        log.debug("Not going to do anything, but persisting the received data.")
+        output_dir = pathlib.Path(self.config["target_dir"])
+        output_dir.mkdir(exist_ok=True, parents=True)
+        with open(output_dir / "amex_preprocessed.npz", 'wb') as fd:
+            np.savez_compressed(fd, **dict(
+                train_floats=X_train_f,
+                train_cat=X_train_c,
+                train_y=y_train,
+                test_floats=X_val_f,
+                test_cat=X_val_c,
+                test_y=y_val,
+            ))
 
 class CatboostMethod(Method):
     def __init__(
