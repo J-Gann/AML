@@ -74,10 +74,7 @@ def amex_impute(X, *, cat_vars, strategy, per_customer=True):
     X[X_cat_cols] = X[X_cat_cols].transform(lambda s: s.cat.codes)
 
     log.debug("Imputation done.")
-    if not X.isnull().any().any():
-        import ipdb;ipdb.set_trace()
-    #TODO disable
-    #assert not X.isnull().any().any(), "After Imputation, null values remain."
+    assert X.isnull().any().any(), "After Imputation, null values remain."
     return X
 
 def _add_missing_rows(df):
@@ -164,6 +161,11 @@ class AmexPreprocessor(Preprocessor):
         self.config = config
 
     def preprocess(self, X, y=None):
+        # If any remnants from importing csv are in, delete.
+        junk_columns = [x for x in X.columns if 'Unnamed' in x]
+        for col in junk_columns:
+            log.debug(f'Deleting junk column: {col}')
+            X = X.drop(col, axis=1)
         # TODO is it smart to attempt to remove correlated cat variables?
         X, _ = remove_correlated_features(X, self.config["correlation_drop_percentage"])
         X = amex_fill_missing_records(X) # TODO should we make it a hyperparam?
@@ -240,4 +242,5 @@ class AmexPreprocessor(Preprocessor):
         X_cat = X_unstack[set(cat_vars_wide)].to_numpy()
 
         y_np = y.target.to_numpy() if y is not None else None
+        import ipdb;ipdb.set_trace()
         return X_floats, X_cat, y_np
